@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基础汉字闪卡 - PNG兼容版</title>
+    <style>
+        :root { --primary: #4a90e2; --accent: #ff7675; --bg: #f4f7f9; }
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: var(--bg); margin: 0; display: flex;
+            flex-direction: column; align-items: center; justify-content: center; min-height: 100vh;
+        }
+        .header { margin-bottom: 20px; text-align: center; color: #444; }
+        .card-container {
+            position: relative; width: 340px; 
+            perspective: 1000px; margin: 0 60px;
+        }
+        .card {
+            width: 100%; min-height: 450px;
+            position: relative; transform-style: preserve-3d;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer; border-radius: 24px; background: #fff;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.12);
+        }
+        .card.flipped { transform: rotateY(180deg); }
+        .face {
+            position: absolute; width: 100%; height: 100%;
+            backface-visibility: hidden; border-radius: 24px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
+        .face-front { background: #fff; padding: 10px; box-sizing: border-box; }
+        .face-front img { width: 100%; height: auto; max-height: 100%; object-fit: contain; border-radius: 15px; }
+        
+        .face-back { transform: rotateY(180deg); background: #fffef9; border: 1px solid #eee; }
+        .hanzi { font-size: 110px; font-weight: bold; color: #222; margin-bottom: 5px; }
+        .pinyin { font-size: 34px; color: var(--accent); font-weight: 500; }
+        .english { font-size: 22px; color: #888; margin-top: 10px; }
+        
+        .arrow {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            width: 55px; height: 55px; background: white; border: none;
+            border-radius: 50%; font-size: 28px; cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1); z-index: 100; color: var(--primary);
+            transition: all 0.2s; display: flex; align-items: center; justify-content: center;
+        }
+        .arrow:hover { background: var(--primary); color: white; scale: 1.1; }
+        .prev { left: -75px; } .next { right: -75px; }
+        
+        .error-placeholder {
+            padding: 30px; text-align: center; color: #999; line-height: 1.6;
+        }
+        #counter { margin-top: 25px; font-size: 18px; font-weight: bold; color: #7f8c8d; }
+
+        @media (max-width: 600px) {
+            .card-container { width: 280px; margin: 0; }
+            .prev { left: 10px; width: 45px; height: 45px; opacity: 0.8; }
+            .next { right: 10px; width: 45px; height: 45px; opacity: 0.8; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h2 style="margin:0">Chinese Learning Cards</h2>
+        <p style="font-size:14px; opacity:0.7">Click to Flip | 🔊 Automatic Pronunciation</p>
+    </div>
+
+    <div class="card-container">
+        <button class="arrow prev" onclick="move(-1, event)">❮</button>
+        <button class="arrow next" onclick="move(1, event)">❯</button>
+
+        <div class="card" id="card" onclick="flip()">
+            <div class="face face-front" id="front">
+                </div>
+            <div class="face face-back" id="back">
+                </div>
+        </div>
+    </div>
+
+    <div id="counter">1 / 16</div>
+
+    <script>
+        const cards = [
+            { hz: '月', py: 'yuè', en: 'Moon' }, { hz: '明', py: 'míng', en: 'Bright' },
+            { hz: '口', py: 'kǒu', en: 'Mouth' }, { hz: '目', py: 'mù', en: 'Eye' },
+            { hz: '人', py: 'rén', en: 'Person' }, { hz: '手', py: 'shǒu', en: 'Hand' },
+            { hz: '天', py: 'tiān', en: 'Sky' }, { hz: '山', py: 'shān', en: 'Mountain' },
+            { hz: '木', py: 'mù', en: 'Wood' }, { hz: '土', py: 'tǔ', en: 'Soil' },
+            { hz: '田', py: 'tián', en: 'Field' }, { hz: '大', py: 'dà', en: 'Big' },
+            { hz: '小', py: 'xiǎo', en: 'Small' }, { hz: '多', py: 'duō', en: 'Many' },
+            { hz: '少', py: 'shǎo', en: 'Few' }, { hz: '日', py: 'rì', en: 'Sun' }
+        ];
+
+        let idx = 0;
+        const cardNode = document.getElementById('card');
+
+        function loadCard() {
+            const item = cards[idx];
+            cardNode.classList.remove('flipped');
+            
+            // 默认搜索 png，如果失败则报错
+            const imgPath = `hz/${idx + 1}.png`; 
+            
+            document.getElementById('front').innerHTML = `
+                <img src="${imgPath}" id="main-img" onerror="handleImgError(this, ${idx+1})">
+            `;
+            
+            document.getElementById('back').innerHTML = `
+                <div class="hanzi">${item.hz}</div>
+                <div class="pinyin">${item.py}</div>
+                <div class="english">${item.en}</div>
+            `;
+            
+            document.getElementById('counter').innerText = `${idx + 1} / 16`;
+        }
+
+        // 处理图片加载失败（比如找不到 .png）
+        function handleImgError(img, num) {
+            // 如果 png 加载失败，尝试加载 jpg (作为双保险)
+            if (!img.dataset.triedJpg) {
+                img.dataset.triedJpg = true;
+                img.src = `hz/${num}.jpg`;
+                return;
+            }
+            // 如果都失败了，显示提示
+            img.parentElement.innerHTML = `
+                <div class="error-placeholder">
+                    <span style="font-size:40px">🖼️</span><br>
+                    <b style="color:#e74c3c">Image Missing</b><br>
+                    <small>Please check:<br><b>hz/${num}.png</b></small>
+                </div>`;
+        }
+
+        function flip() {
+            cardNode.classList.toggle('flipped');
+            if(cardNode.classList.contains('flipped')) {
+                speak(cards[idx].hz);
+            }
+        }
+
+        function move(dir, e) {
+            e.stopPropagation();
+            window.speechSynthesis.cancel();
+            idx = (idx + dir + 16) % 16;
+            loadCard();
+        }
+
+        function speak(text) {
+            const msg = new SpeechSynthesisUtterance(text);
+            msg.lang = 'zh-CN';
+            msg.rate = 0.8;
+            window.speechSynthesis.speak(msg);
+        }
+
+        // 键盘监听
+        document.addEventListener('keydown', (e) => {
+            if(e.key === 'ArrowLeft') move(-1, {stopPropagation:()=>{}});
+            if(e.key === 'ArrowRight') move(1, {stopPropagation:()=>{}});
+            if(e.key === ' ') { e.preventDefault(); flip(); }
+        });
+
+        window.onload = loadCard;
+    </script>
+</body>
+</html>
